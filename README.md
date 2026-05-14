@@ -65,7 +65,7 @@ This helps avoid running `-sV` against all 65535 ports from the start.
 
 The CSV output contains these columns:
 
-    Target, Resolved IP, Protocol, Port, Port Status, Service
+    Target, Resolved IP, Protocol, Port, Port Status, Service, Service Info
 
 Column meaning:
 
@@ -77,10 +77,11 @@ Column meaning:
 | Port | Port number |
 | Port Status | Nmap port state, such as open, closed, filtered, or open\|filtered |
 | Service | Service name reported by Nmap, such as http, ssh, domain, or unknown |
+| Service Info | Extra service details from version detection, such as product, version, and extra info |
 
 Example CSV output:
 
-    Target,Resolved IP,Protocol,Port,Port Status,Service
-    example.com,93.184.216.34,TCP,80,open,http
-    example.com,93.184.216.34,TCP,443,open,https
-    192.168.1.10,192.168.1.10,UDP,53,open|filtered,domain
+    Target,Resolved IP,Protocol,Port,Port Status,Service,Service Info
+    example.com,93.184.216.34,TCP,80,open,http,Apache httpd 2.4.52
+    example.com,93.184.216.34,TCP,443,open,https,
+    192.168.1.10,192.168.1.10,UDP,53,open|filtered,domain,
