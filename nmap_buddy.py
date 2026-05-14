@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import csv
-import sys
 import argparse
 import shlex
 import xml.etree.ElementTree as ET
@@ -49,16 +48,17 @@ Input:
 
 Output CSV columns:
 
-  Target, Resolved IP, Protocol, Port, Port Status, Service
+  Target, Resolved IP, Protocol, Port, Port Status, Service, Service Info
 
 Column meaning:
 
-  Target       Hostname/FQDN if present in the XML, otherwise the scanned IP.
-  Resolved IP  The IP address Nmap scanned.
-  Protocol     TCP or UDP.
-  Port         Port number.
-  Port Status  Nmap port state, such as open, closed, filtered, or open|filtered.
-  Service      Service name reported by Nmap, such as http, ssh, domain, or unknown.
+  Target        Hostname/FQDN if present in the XML, otherwise the scanned IP.
+  Resolved IP   The IP address Nmap scanned.
+  Protocol      TCP or UDP.
+  Port          Port number.
+  Port Status   Nmap port state, such as open, closed, filtered, or open|filtered.
+  Service       Service name reported by Nmap, such as http, ssh, domain, or unknown.
+  Service Info  Extra service details from -sV, such as product, version, and extra info.
 
 Example workflow:
 
@@ -188,11 +188,31 @@ def scan_used_version_detection(nmap_args):
         if token.startswith("--version-intensity"):
             return True
 
-        # Catches unusual combined forms containing service/version detection.
         if token.startswith("-") and "sV" in token:
             return True
 
     return False
+
+
+def get_service_details(port):
+    service_el = port.find("service")
+
+    service = "unknown"
+    service_info = ""
+
+    if service_el is not None:
+        service = service_el.get("name", "") or "unknown"
+
+        service_info_parts = []
+
+        for attr in ("product", "version", "extrainfo"):
+            value = service_el.get(attr, "")
+            if value:
+                service_info_parts.append(value)
+
+        service_info = " ".join(service_info_parts)
+
+    return service, service_info
 
 
 def parse_xml_file(xml_file, writer, discovered):
@@ -200,10 +220,10 @@ def parse_xml_file(xml_file, writer, discovered):
         tree = ET.parse(xml_file)
         root = tree.getroot()
     except ET.ParseError as e:
-        print(f"[!] Skipping invalid XML: {xml_file} - {e}", file=sys.stderr)
+        print(f"[!] Skipping invalid XML: {xml_file} - {e}")
         return
     except Exception as e:
-        print(f"[!] Failed to read: {xml_file} - {e}", file=sys.stderr)
+        print(f"[!] Failed to read: {xml_file} - {e}")
         return
 
     nmap_args = root.get("args", "")
@@ -233,11 +253,7 @@ def parse_xml_file(xml_file, writer, discovered):
             state_el = port.find("state")
             port_status = state_el.get("state", "") if state_el is not None else ""
 
-            service_el = port.find("service")
-            service = service_el.get("name", "") if service_el is not None else ""
-
-            if not service:
-                service = "unknown"
+            service, service_info = get_service_details(port)
 
             writer.writerow({
                 "Target": target,
@@ -245,7 +261,8 @@ def parse_xml_file(xml_file, writer, discovered):
                 "Protocol": protocol_display,
                 "Port": port_id,
                 "Port Status": port_status,
-                "Service": service
+                "Service": service,
+                "Service Info": service_info
             })
 
             if protocol == "tcp" and port_status == "open":
@@ -358,7 +375,8 @@ def main():
         "Protocol",
         "Port",
         "Port Status",
-        "Service"
+        "Service",
+        "Service Info"
     ]
 
     with open(output_csv, "w", newline="", encoding="utf-8") as out_f:
@@ -369,11 +387,11 @@ def main():
             path = Path(xml_file)
 
             if not path.exists():
-                print(f"[!] File does not exist, skipping: {xml_file}", file=sys.stderr)
+                print(f"[!] File does not exist, skipping: {xml_file}")
                 continue
 
             if path.stat().st_size == 0:
-                print(f"[!] Empty file, skipping: {xml_file}", file=sys.stderr)
+                print(f"[!] Empty file, skipping: {xml_file}")
                 continue
 
             print(f"[*] Processing: {xml_file}")
